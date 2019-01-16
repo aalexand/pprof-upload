@@ -9,7 +9,7 @@ for visualization.
 [Download and install](https://golang.org/doc/install) Go, then run command
 
 ```
-go get -u github.com/aalexand/pprof-upload
+go install github.com/aalexand/pprof-upload
 ```
 
 Add your `$GOPATH/bin` to `$PATH` for convenience.
@@ -31,8 +31,12 @@ pprof-upload -project_id=your-project-id ~/path/to/profile.pb.gz
 ```
 
 The command will upload the profile and print out a URL that can be visited to
-view the data. Note that Stackdriver Profiler stores data for 30 days, so the
-profile will be gone after about a month.
+view the data. You should see something like
+
+![Stackdriver Profiler UI](sample.png?raw=true "Stackdriver Profiler UI")
+
+Note that Stackdriver Profiler stores data for 30 days, so the profile will be
+gone after about a month.
 
 See also [Stackdriver Profiler
 quickstart](https://cloud.google.com/profiler/docs/quickstart) on how to enable
