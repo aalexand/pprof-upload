@@ -9,7 +9,7 @@ for visualization.
 [Download and install](https://golang.org/doc/install) Go, then run command
 
 ```
-go install github.com/aalexand/pprof-upload
+go get github.com/aalexand/pprof-upload
 ```
 
 Add your `$GOPATH/bin` to `$PATH` for convenience.
