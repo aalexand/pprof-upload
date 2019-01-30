@@ -38,6 +38,24 @@ view the data. You should see something like
 Note that Stackdriver Profiler stores data for 30 days, so the profile will be
 gone after about a month.
 
+You can pass more than one profile path to the tool:
+
+```
+pprof-upload -project_id=your-project-id ~/path/*.pg.gz
+```
+
+In that case the profiles will be merged before being uploaded. The profiles
+must be merge-compatible - have the same profile type (e.g. `heap` vs. `cpu`)
+and set of metrics. You can also disable the merge like:
+
+```
+pprof-upload -merge=false -project_id=your-project-id ~/path/*.pg.gz
+```
+
+The profiles must still be merge-compatible but will be uploaded individually
+such that the merge will only be done at the viewing time. This is rarely needed
+and the main benefit is the ability to use the weight filter in the profiler UI.
+
 See also [Stackdriver Profiler
 quickstart](https://cloud.google.com/profiler/docs/quickstart) on how to enable
 continuous production profiling for a service running on Google Cloud Platform.
