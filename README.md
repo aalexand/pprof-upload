@@ -35,9 +35,6 @@ view the data. You should see something like
 
 ![Stackdriver Profiler UI](sample.png?raw=true "Stackdriver Profiler UI")
 
-Note that Stackdriver Profiler stores data for 30 days, so the profile will be
-gone after about a month.
-
 You can pass more than one profile path to the tool:
 
 ```
@@ -55,6 +52,9 @@ pprof-upload -merge=false -project_id=your-project-id ~/path/*.pg.gz
 The profiles must still be merge-compatible but will be uploaded individually
 such that the merge will only be done at the viewing time. This is rarely needed
 and the main benefit is the ability to use the weight filter in the profiler UI.
+
+Note that Stackdriver Profiler stores data for 30 days, so the profile will be
+gone after about a month.
 
 See also [Stackdriver Profiler
 quickstart](https://cloud.google.com/profiler/docs/quickstart) on how to enable
