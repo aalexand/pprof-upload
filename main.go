@@ -20,11 +20,12 @@ import (
 var (
 	projectID = flag.String("project_id", "", "cloud project ID where the profile will be uploaded")
 	apiAddr   = flag.String("api_addr", "cloudprofiler.googleapis.com:443", "profiler API address")
+	merge     = flag.Bool("merge", true, "when false, upload individual profiles")
 )
 
-// readProfiles reads profile files in pprof format at specified paths and
-// merges them. Input profiles must have the same type (e.g. heap vs. CPU).
-func readProfiles(fnames []string) (*profile.Profile, error) {
+// readProfiles reads profile files in pprof format at specified paths.
+// Input profiles must have the same type (e.g. heap vs. CPU).
+func readProfiles(fnames []string) ([]*profile.Profile, error) {
 	var ps []*profile.Profile
 	for _, fname := range fnames {
 		file, err := os.Open(fname)
@@ -38,25 +39,20 @@ func readProfiles(fnames []string) (*profile.Profile, error) {
 		}
 		ps = append(ps, p)
 	}
-	p, err := profile.Merge(ps)
-	if err != nil {
-		return nil, fmt.Errorf("failed to merge profiles: %v", err)
-	}
-	return p, nil
+	return ps, nil
 }
 
 const scope = "https://www.googleapis.com/auth/monitoring.write"
 
-// uploadProfile uploads the specified profile to Stackdriver Profiler. It
-// returns the name of the profile type detected from the profile content.
-func uploadProfile(ctx context.Context, p *profile.Profile, service, version string) (string, error) {
+// uploadProfile uploads the specified profile to Stackdriver Profiler.
+func uploadProfile(ctx context.Context, p *profile.Profile, service, version string) error {
 	pt, err := guessType(p)
 	if err != nil {
-		return "", err
+		return err
 	}
 	var bb bytes.Buffer
 	if err := p.Write(&bb); err != nil {
-		return "", err
+		return err
 	}
 	opts := []option.ClientOption{
 		option.WithEndpoint(*apiAddr),
@@ -64,7 +60,7 @@ func uploadProfile(ctx context.Context, p *profile.Profile, service, version str
 	}
 	conn, err := gtransport.Dial(ctx, opts...)
 	if err != nil {
-		return "", err
+		return err
 	}
 	client := pb.NewProfilerServiceClient(conn)
 	req := pb.CreateOfflineProfileRequest{
@@ -83,9 +79,9 @@ func uploadProfile(ctx context.Context, p *profile.Profile, service, version str
 	}
 	_, err = client.CreateOfflineProfile(ctx, &req)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return pt.String(), nil
+	return nil
 }
 
 func guessType(p *profile.Profile) (pb.ProfileType, error) {
@@ -112,18 +108,33 @@ func main() {
 		os.Exit(2)
 	}
 
-	p, err := readProfiles(flag.Args())
+	ps, err := readProfiles(flag.Args())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	if !*merge {
+		fmt.Fprintf(os.Stderr, "Will upload %d profile(s)\n", len(ps))
+	}
+
+	// Merge the profiles even if we plan to upload them individually, that is to
+	// make sure that they can be merged.
+	p, err := profile.Merge(ps)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: profiles cannot be merged (different profile types?): %v\n", err)
+		os.Exit(1)
+	}
+
+	ptype, err := guessType(p)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
+	if *merge {
+		ps = []*profile.Profile{p}
+	}
 	now := time.Now()
-
-	// Reset the profile timestamp to current time so that it's recent in the UI.
-	// Otherwise the uploaded profile might have its timestamp even older than 30
-	// days which is the maximum query window in the UI.
-	p.TimeNanos = now.UnixNano()
 
 	// Assign a unique version based on the current timestamp so that the
 	// uploaded profile can be filtered in the UI using the version filter.
@@ -131,12 +142,19 @@ func main() {
 	version := now.Format(time.RFC3339)
 
 	ctx := context.Background()
-	ptype, err := uploadProfile(ctx, p, service, version)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	for i, p := range ps {
+		// Reset the profile timestamp to ~current time so that it's recent in the
+		// UI. Otherwise the uploaded profile might have its timestamp even older
+		// than 30 days which is the maximum query window in the UI. Make the profile
+		// timestamp unique in microseconds since it's used as a key in the profiler.
+		p.TimeNanos = now.UnixNano() + int64(i)*1000
+		if err := uploadProfile(ctx, p, service, version); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "Uploaded %d profile(s)\n", i+1)
 	}
-	fmt.Println("Profile uploaded, click the link below to view it.")
+
 	// Escape the ":" character in the profiler URL as it has special meaning.
 	version = strings.Replace(version, ":", "~3a", -1)
 	fmt.Printf("https://console.cloud.google.com/profiler/%s;type=%s;version=%s?project=%s\n", service, ptype, version, *projectID)
