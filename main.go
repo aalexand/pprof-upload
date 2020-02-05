@@ -18,7 +18,9 @@ import (
 )
 
 var (
-	projectID = flag.String("project_id", "", "cloud project ID where the profile will be uploaded")
+	projectID = flag.String("project_id", "", "cloud project ID where the profile will be uploaded (Required)")
+	service   = flag.String("service_name", "uploaded-profiles", "name of service for uploaded profiles")
+	version   = flag.String("service_version", "", "version of service for uploaded profiles")
 	apiAddr   = flag.String("api_addr", "cloudprofiler.googleapis.com:443", "profiler API address")
 	merge     = flag.Bool("merge", true, "when false, upload individual profiles")
 )
@@ -105,6 +107,7 @@ func main() {
 
 	if *projectID == "" || len(flag.Args()) == 0 {
 		fmt.Fprintln(os.Stderr, "Usage: pprof-upload -project_id=PROJECT_ID FILE...")
+		flag.PrintDefaults()
 		os.Exit(2)
 	}
 
@@ -138,8 +141,10 @@ func main() {
 
 	// Assign a unique version based on the current timestamp so that the
 	// uploaded profile can be filtered in the UI using the version filter.
-	const service = "uploaded-profiles"
-	version := now.Format(time.RFC3339)
+	serviceVersion := *version
+	if len(serviceVersion) == 0 {
+		serviceVersion = now.Format(time.RFC3339)
+	}
 
 	ctx := context.Background()
 	for i, p := range ps {
@@ -148,7 +153,7 @@ func main() {
 		// than 30 days which is the maximum query window in the UI. Make the profile
 		// timestamp unique in microseconds since it's used as a key in the profiler.
 		p.TimeNanos = now.UnixNano() + int64(i)*1000
-		if err := uploadProfile(ctx, p, service, version); err != nil {
+		if err := uploadProfile(ctx, p, *service, *version); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -156,6 +161,6 @@ func main() {
 	}
 
 	// Escape the ":" character in the profiler URL as it has special meaning.
-	version = strings.Replace(version, ":", "~3a", -1)
-	fmt.Printf("https://console.cloud.google.com/profiler/%s;type=%s;version=%s?project=%s\n", service, ptype, version, *projectID)
+	serviceVersion = strings.Replace(serviceVersion, ":", "~3a", -1)
+	fmt.Printf("https://console.cloud.google.com/profiler/%s;type=%s;version=%s?project=%s\n", *service, ptype, serviceVersion, *projectID)
 }
