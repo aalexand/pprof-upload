@@ -19,7 +19,7 @@ import (
 
 var (
 	projectID = flag.String("project_id", "", "cloud project ID where the profile will be uploaded (Required)")
-	service   = flag.String("service_name", "uploaded-profiles", "name of service for uploaded profiles")
+	service   = flag.String("service", "uploaded-profiles", "name of service for uploaded profiles")
 	version   = flag.String("service_version", "", "version of service for uploaded profiles")
 	apiAddr   = flag.String("api_addr", "cloudprofiler.googleapis.com:443", "profiler API address")
 	merge     = flag.Bool("merge", true, "when false, upload individual profiles")
